@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Folha de Ponto</title>
+    <link rel="stylesheet" href="/static/stiles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+
+<header class="top-header">
+
+    <div class="texto-gradient">
+        DMT-FIIT
+    </div>
+
+    <div class="header-center">
+        <img src="/static/img/logo.png">
+    </div>
+
+    <div class="header-right">
+        <a href="/logout" class="btn-top sair">Sair</a>
+    </div>
+
+</header>
+
+<div class="info-usuario">
+    <h2>👤 {{ usuario }}</h2>
+    <p>Total de horas registradas</p>
+    <h3>⏱ {{ total }} horas</h3>
+</div>
+
+<div class="page">
+
+<form action="/bater" method="post">
+    <input type="hidden" name="data" value="{{ data }}">
+
+    <button class="btn-bater">
+        ⏱ {{ proxima }}
+    </button>
+</form>
+
+<h3 class="hist">📊 Histórico</h3>
+
+<div style="overflow-x:auto;">
+<table>
+    <tr>
+        <th>Data</th>
+        <th>Entrada</th>
+        <th>Saída Almoço</th>
+        <th>Volta Almoço</th>
+        <th>Saída Final</th>
+        <th>Horas</th>
+    </tr>
+
+    {% for l in dados %}
+    <tr>
+        <td>{{ l[0] }}</td>
+        <td>{{ l[1] }}</td>
+        <td>{{ l[2] }}</td>
+        <td>{{ l[3] }}</td>
+        <td>{{ l[4] }}</td>
+        <td>{{ l[5] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+</div>
+</div>
+
+</body>
+</html>

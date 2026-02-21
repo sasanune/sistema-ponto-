@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Relatório Mensal</title>
+    <link rel="stylesheet" href="/static/stiles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body class="relatorio-body">
+
+<div class="card1">
+    <h1 class="titulo-relatorio">📅 Relatório Mensal</h1>
+
+<div style="overflow-x:auto;">
+    <table>
+<tr>
+    <th>Funcionário</th>
+    <th>Data</th>
+    <th>Entrada</th>
+    <th>Saída Almoço</th>
+    <th>Volta</th>
+    <th>Saída</th>
+    <th>Horas</th>
+    <th>Ações</th>
+</tr>
+
+{% for linha in dados %}
+<tr>
+    <td>{{ linha[1] }}</td>
+    <td>{{ linha[2] }}</td>
+    <td>{{ linha[3] }}</td>
+    <td>{{ linha[4] }}</td>
+    <td>{{ linha[5] }}</td>
+    <td>{{ linha[6] }}</td>
+    <td>{{ linha[7] }}</td>
+    <td>
+        <a href="/editar/{{ linha[0] }}" class="btn-editar">
+            Editar
+        </a>
+    </td>
+</tr>
+{% endfor %}
+</table>
+
+    <form action="/zerar-horas" method="post"
+          onsubmit="return confirm('Deseja zerar todas as horas?')">
+        <button class="btn-zerar">🗑 Zerar Horas</button>
+    </form>
+
+    <a href="/" class="btn-voltar">← Voltar</a>
+    </div>
+</div>
+
+</body>
+</html>

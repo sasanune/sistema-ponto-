@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Editar Ponto</title>
+    <link rel="stylesheet" href="/static/stiles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body class="relatorio-body">
+
+<div class="card1">
+    <h2>✏️ Editar Ponto</h2>
+
+    <form method="post">
+        <label>Entrada</label>
+        <input type="time" name="entrada" value="{{ registro[3] }}">
+
+        <label>Saída Almoço</label>
+        <input type="time" name="saida_almoco" value="{{ registro[4] }}">
+
+        <label>Volta Almoço</label>
+        <input type="time" name="volta_almoco" value="{{ registro[5] }}">
+
+        <label>Saída Final</label>
+        <input type="time" name="saida_final" value="{{ registro[6] }}">
+
+        <button type="submit">💾 Salvar</button>
+    </form>
+
+    <a href="/relatorio" class="btn-voltar">← Voltar</a>
+</div>
+
+</body>
+</html>

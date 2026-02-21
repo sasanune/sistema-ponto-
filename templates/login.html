@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <link rel="stylesheet" href="/static/stiles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body class="login-body">
+
+<div class="login-box">
+
+    <div class="logo-login">
+        <img src="/static/img/logo.png">
+    </div>
+
+    <h2>Bem-vindo</h2>
+
+    {% if erro %}
+        <p style="color:#b91c1c; font-size:13px;">{{ erro }}</p>
+    {% endif %}
+
+    <form method="post">
+
+        <div id="funcionario-box">
+            <select name="usuario">
+                <option value="">-- Escolha seu nome --</option>
+                {% for u in usuarios %}
+                    <option value="{{ u[0] }}">{{ u[0] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="admin-box" style="display:none;">
+            <input type="password" name="admin_senha" placeholder="Senha do administrador">
+        </div>
+
+        <button type="submit">Entrar</button>
+    </form>
+
+    <button type="button" class="btn-admin" onclick="ativarAdmin()">
+        Entrar como administrador
+    </button>
+
+</div>
+
+<script>
+function ativarAdmin() {
+    document.getElementById("funcionario-box").style.display = "none";
+    document.getElementById("admin-box").style.display = "block";
+}
+</script>
+
+</body>
+</html>

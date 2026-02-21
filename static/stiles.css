@@ -1,0 +1,430 @@
+/* =====================
+   RESET BÁSICO
+===================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* =====================
+   VARIÁVEL USADA
+===================== */
+:root {
+    --azul: #000000;
+}
+
+/* =====================
+   BASE BODY
+===================== */
+body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #eb7ef5, #e7b921);
+    font-family: Arial, sans-serif;
+}
+
+/* =====================
+   LOGIN
+===================== */
+.login-body {
+    background: linear-gradient(135deg, #eb7ef5, #e7b921);
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.logo-login {
+    margin: -34px -45px 34px -45px;
+}
+
+.logo-login img {
+    width: 94%;
+    max-height: 140px;
+    object-fit: cover;
+    border-radius: 12px 12px 0 0;
+}
+
+.login-box {
+    background: linear-gradient(135deg, #eb7ef5, #e7b921);
+    width: 350px;
+    padding: 35px;
+    border-radius: 12px;
+    text-align: center;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    animation: subir 0.6s ease;
+}
+
+@keyframes subir {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.login-box h2 {
+    margin-bottom: 10px;
+    color: #000;
+}
+
+.login-box p {
+    color: #000;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.login-box select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #19191a;
+}
+
+.login-box button {
+    width: 100%;
+    margin-top: 15px;
+    padding: 12px;
+    background: #000;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.3s;
+    color: white;
+    border: none;
+    border-radius: 6px;
+}
+
+.login-box button:hover {
+    background: #707070;
+}
+
+.btn-admin {
+    margin-top: 12px;
+    width: 100%;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: white;
+    border: none;
+    padding: 12px;
+    background: #000;
+}
+
+.btn-admin:hover {
+    background: #707070;
+}
+
+/* =====================
+   HEADER INDEX
+===================== */
+.top-header {
+    position: relative;
+    background: black;
+    height: 120px;
+    width: 100%;
+}
+
+.texto-gradient {
+    position: absolute;
+    left: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(135deg, #eb7ef5, #e7b921);
+    background-size: 200%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 28px;
+    font-weight: bold;
+    animation: brilho 3s linear infinite;
+}
+
+@keyframes brilho {
+    from { background-position: 0%; }
+    to { background-position: 200%; }
+}
+
+.header-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.header-center img {
+    height: 70px;
+}
+
+.header-right {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.btn-top {
+    padding: 8px 14px;
+    background: #dc3545;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.btn-top:hover {
+    background: #b52a37;
+}
+
+/* =====================
+   USUÁRIO / DASHBOARD
+===================== */
+.info-usuario {
+    text-align: center;
+    margin-top: 30px;
+    margin-bottom: 40px;
+}
+
+.info-usuario h2 {
+    margin-bottom: 5px;
+}
+
+.info-usuario p {
+    font-size: 13px;
+    color: #000;
+    margin-bottom: 5px;
+}
+
+.info-usuario h3 {
+    font-size: 15px;
+    color: var(--azul);
+}
+
+/* =====================
+   FORMULÁRIOS
+===================== */
+form {
+    max-width: 420px;
+    margin: auto;
+}
+
+form label {
+    margin-top: 12px;
+    display: block;
+    font-size: 14px;
+    color: #000;
+}
+
+form input,
+form select {
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+    border: 1px solid #0a0b0c;
+    border-radius: 6px;
+}
+
+form button {
+    width: 100%;
+    margin-top: 18px;
+    padding: 10px;
+    font-size: 14px;
+    background: #000;
+    border: none;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* =====================
+   BOTÃO BATER PONTO
+===================== */
+.btn-bater {
+    background: #000;
+    color: white;
+    padding: 16px;
+    font-size: 14px;
+    border-radius: 10px;
+    border: none;
+    width: 100%;
+    margin-bottom: 20px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-bater:hover {
+    background: #707070;
+    transform: scale(1.03);
+}
+
+/* =====================
+   RELATÓRIO / CARDS
+===================== */
+.relatorio-body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #eb7ef5, #e7b921);
+}
+
+.card1 {
+    background: linear-gradient(135deg, #eb7ef5, #e7b921);
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 700px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    text-align: center;
+    margin: 80px auto;
+}
+
+.titulo-relatorio {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #000;
+    font-size: 26px;
+}
+
+/* =====================
+   BOTÕES RELATÓRIO
+===================== */
+.btn-voltar,
+.btn-zerar {
+    display: block;
+    width: fit-content;
+    margin: 25px auto 0 auto;
+    padding: 10px 18px;
+    background: #000;
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.btn-voltar:hover,
+.btn-zerar:hover {
+    background: #475569;
+}
+
+.btn-editar {
+    background: #000;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 13px;
+    display: inline-block;
+    transition: 0.2s;
+}
+
+.btn-editar:hover {
+    background: #475569;
+}
+
+/* =====================
+   TABELAS
+===================== */
+.hist {
+    margin-top: 15px;
+    color: #000;
+    padding: 10px;
+    font-size: 20px;
+    text-align: center;
+}
+
+table {
+    width: 100%;
+    max-width: 650px;
+    margin: auto;
+    border-collapse: collapse;
+    background: white;
+    font-size: 13px;
+    border-radius: 5px;
+}
+
+table th {
+    background: var(--azul);
+    color: white;
+    padding: 10px;
+    text-align: center;
+}
+
+table td {
+    padding: 8px;
+    text-align: center;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+table tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+table tr:hover {
+    background: #f1f5f9;
+}
+/* =====================
+   RESPONSIVO MOBILE
+===================== */
+
+@media (max-width: 600px) {
+
+    .login-box {
+        width: 92%;
+        padding: 22px;
+    }
+
+    .card1 {
+        width: 95%;
+        padding: 18px;
+        margin: 30px auto;
+    }
+
+    .texto-gradient {
+        font-size: 18px;
+        left: 15px;
+    }
+
+    .header-center img {
+        height: 50px;
+    }
+
+    .header-right {
+        right: 15px;
+    }
+
+    .btn-bater {
+        padding: 18px;
+        font-size: 16px;
+    }
+
+    table {
+        font-size: 11px;
+    }
+
+    table th,
+    table td {
+        padding: 6px;
+    }
+
+    form {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 600px) {
+    .btn-bater {
+        padding: 22px;
+        font-size: 18px;
+    }
+}
+input[type="time"] {
+    height: 45px;
+    font-size: 16px;
+}
+.btn-editar {
+    padding: 10px 14px;
+}
