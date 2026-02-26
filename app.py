@@ -12,6 +12,7 @@ ADMIN_SENHA = "1234"
 # timezone Brasília
 BRASILIA = ZoneInfo("America/Sao_Paulo")
 
+
 # -----------------------
 # Criar banco
 # -----------------------
@@ -28,7 +29,7 @@ def criar_banco():
     """)
 
     c.execute("""
-       CREATE TABLE IF NOT EXISTS ponto (
+        CREATE TABLE IF NOT EXISTS ponto (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             funcionario TEXT,
             data TEXT,
@@ -37,9 +38,15 @@ def criar_banco():
             volta_almoco TEXT,
             saida_final TEXT,
             horas REAL,
-            horas_extras REAL
+            horas_extras REAL DEFAULT 0
         )
     """)
+
+    # garante que a coluna existe (para bancos antigos)
+    try:
+        c.execute("ALTER TABLE ponto ADD COLUMN horas_extras REAL DEFAULT 0")
+    except:
+        pass
 
     c.execute("SELECT COUNT(*) FROM usuarios")
 
@@ -52,6 +59,7 @@ def criar_banco():
 
     conn.commit()
     conn.close()
+
 
 criar_banco()
 
@@ -105,7 +113,7 @@ def login():
 
 
 # -----------------------
-# HOME FUNCIONÁRIO
+# HOME
 # -----------------------
 @app.route("/home")
 def home():
@@ -126,19 +134,23 @@ def home():
     c.execute("""
         SELECT data, entrada, saida_almoco, volta_almoco, saida_final, horas, horas_extras
         FROM ponto
-        WHERE funcionario = ?
+        WHERE funcionario=?
         ORDER BY id DESC
     """, (usuario,))
 
     dados = c.fetchall()
 
     c.execute("""
-        SELECT ROUND(SUM(horas), 2)
+        SELECT ROUND(SUM(horas),2),
+               ROUND(SUM(horas_extras),2)
         FROM ponto
-        WHERE funcionario = ?
+        WHERE funcionario=?
     """, (usuario,))
 
-    total = c.fetchone()[0] or 0
+    row_total = c.fetchone()
+
+    total = row_total[0] or 0
+    total_extra = row_total[1] or 0
 
     c.execute("""
         SELECT entrada, saida_almoco, volta_almoco, saida_final
@@ -150,22 +162,17 @@ def home():
     row = c.fetchone()
 
     if not row:
-
         proxima = "Bater Entrada"
-
     else:
 
         e, sa, va, sf = row
 
         if e and not sa:
             proxima = "Saída Almoço"
-
         elif sa and not va:
             proxima = "Volta Almoço"
-
         elif va and not sf:
             proxima = "Saída Final"
-
         else:
             proxima = "Nova Entrada"
 
@@ -177,6 +184,7 @@ def home():
         data=data,
         dados=dados,
         total=total,
+        total_extra=total_extra,
         proxima=proxima
     )
 
@@ -192,9 +200,10 @@ def bater():
 
     usuario = session["usuario"]
 
-    agora = datetime.now(BRASILIA).strftime("%H:%M")
+    agora_dt = datetime.now(BRASILIA)
 
-    data = datetime.now(BRASILIA).strftime("%d/%m/%Y")
+    agora = agora_dt.strftime("%H:%M")
+    data = agora_dt.strftime("%d/%m/%Y")
 
     conn = sqlite3.connect("banco.db")
     c = conn.cursor()
@@ -223,7 +232,6 @@ def bater():
         ultimo = sf or va or sa or e
 
         if ultimo == agora:
-
             conn.close()
             return redirect("/home")
 
@@ -245,19 +253,18 @@ def bater():
 
             formato = "%H:%M"
 
-            def em_minutos(h):
+            def em_min(h):
                 t = datetime.strptime(h, formato)
-                return t.hour * 60 + t.minute
+                return t.hour*60+t.minute
 
             total_min = (
-                em_minutos(sa) - em_minutos(e)
+                em_min(sa) - em_min(e)
             ) + (
-                em_minutos(agora) - em_minutos(va)
+                em_min(agora) - em_min(va)
             )
 
-            horas = round(total_min / 60, 2)
+            horas = round(total_min/60, 2)
 
-            # calcular horas extras (acima de 8h)
             if horas > 9:
                 horas_extras = round(horas - 9, 2)
             else:
@@ -265,8 +272,9 @@ def bater():
 
             c.execute("""
                 UPDATE ponto
-                SET saida_final=?, horas=?, horas_extras=?
-
+                SET saida_final=?,
+                    horas=?,
+                    horas_extras=?
                 WHERE id=?
             """, (agora, horas, horas_extras, pid))
 
@@ -330,80 +338,6 @@ def zerar_horas():
     conn.close()
 
     return redirect("/relatorio")
-
-
-# -----------------------
-# EDITAR
-# -----------------------
-@app.route("/editar/<int:id>", methods=["GET", "POST"])
-def editar(id):
-
-    if session.get("usuario") != "ADMIN":
-        return redirect("/")
-
-    conn = sqlite3.connect("banco.db")
-    c = conn.cursor()
-
-    if request.method == "POST":
-
-        entrada = request.form["entrada"]
-        saida_almoco = request.form["saida_almoco"]
-        volta_almoco = request.form["volta_almoco"]
-        saida_final = request.form["saida_final"]
-
-        horas = None
-
-        if entrada and saida_almoco and volta_almoco and saida_final:
-
-            formato = "%H:%M"
-
-            def em_minutos(h):
-                t = datetime.strptime(h, formato)
-                return t.hour * 60 + t.minute
-
-            total_min = (
-                em_minutos(saida_almoco) - em_minutos(entrada)
-            ) + (
-                em_minutos(saida_final) - em_minutos(volta_almoco)
-            )
-
-            horas = round(total_min / 60, 2)
-
-        c.execute("""
-            UPDATE ponto
-            SET entrada=?,
-            saida_almoco=?,
-            volta_almoco=?,
-            saida_final=?,
-            horas=?
-            WHERE id=?
-        """, (
-            entrada,
-            saida_almoco,
-            volta_almoco,
-            saida_final,
-            horas,
-            id
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return redirect("/relatorio")
-
-    c.execute(
-        "SELECT * FROM ponto WHERE id=?",
-        (id,)
-    )
-
-    registro = c.fetchone()
-
-    conn.close()
-
-    return render_template(
-        "editar.html",
-        registro=registro
-    )
 
 
 # -----------------------
