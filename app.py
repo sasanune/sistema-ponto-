@@ -28,7 +28,7 @@ def criar_banco():
     """)
 
     c.execute("""
-        CREATE TABLE IF NOT EXISTS ponto (
+       CREATE TABLE IF NOT EXISTS ponto (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             funcionario TEXT,
             data TEXT,
@@ -36,7 +36,8 @@ def criar_banco():
             saida_almoco TEXT,
             volta_almoco TEXT,
             saida_final TEXT,
-            horas REAL
+            horas REAL,
+            horas_extras REAL
         )
     """)
 
@@ -123,7 +124,7 @@ def home():
     c = conn.cursor()
 
     c.execute("""
-        SELECT data, entrada, saida_almoco, volta_almoco, saida_final, horas
+        SELECT data, entrada, saida_almoco, volta_almoco, saida_final, horas, horas_extras
         FROM ponto
         WHERE funcionario = ?
         ORDER BY id DESC
@@ -256,11 +257,18 @@ def bater():
 
             horas = round(total_min / 60, 2)
 
+            # calcular horas extras (acima de 8h)
+            if horas > 9:
+                horas_extras = round(horas - 9, 2)
+            else:
+                horas_extras = 0
+
             c.execute("""
                 UPDATE ponto
-                SET saida_final=?, horas=?
+                SET saida_final=?, horas=?, horas_extras=?
+
                 WHERE id=?
-            """, (agora, horas, pid))
+            """, (agora, horas, horas_extras, pid))
 
         else:
 
