@@ -1,15 +1,8 @@
 from flask import Flask, render_template, request, redirect, session
-import os
+import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
-# banco
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-if DATABASE_URL:
-    import psycopg2
-else:
-    import sqlite3
+import os
 
 app = Flask(__name__)
 app.secret_key = "chave_secreta_simples"
@@ -19,60 +12,33 @@ ADMIN_SENHA = "1234"
 # timezone Brasília
 BRASILIA = ZoneInfo("America/Sao_Paulo")
 
+# caminho persistente no Render
+DB_PATH = "/opt/render/project/src/banco.db"
+
 
 # -----------------------
-# CONEXÃO BANCO
+# conexão banco
 # -----------------------
 def get_conn():
-
-    if DATABASE_URL:
-        return psycopg2.connect(DATABASE_URL)
-
-    else:
-        return sqlite3.connect("banco.db")
+    return sqlite3.connect(DB_PATH)
 
 
 # -----------------------
-# CRIAR BANCO
+# criar banco
 # -----------------------
 def criar_banco():
 
     conn = get_conn()
     c = conn.cursor()
 
-    if DATABASE_URL:
-
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id SERIAL PRIMARY KEY,
-            nome TEXT
-        )
-        """)
-
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS ponto (
-            id SERIAL PRIMARY KEY,
-            funcionario TEXT,
-            data TEXT,
-            entrada TEXT,
-            saida_almoco TEXT,
-            volta_almoco TEXT,
-            saida_final TEXT,
-            horas REAL,
-            horas_extras REAL
-        )
-        """)
-
-    else:
-
-        c.execute("""
+    c.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT
         )
-        """)
+    """)
 
-        c.execute("""
+    c.execute("""
         CREATE TABLE IF NOT EXISTS ponto (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             funcionario TEXT,
@@ -84,15 +50,16 @@ def criar_banco():
             horas REAL,
             horas_extras REAL
         )
-        """)
+    """)
 
     c.execute("SELECT COUNT(*) FROM usuarios")
 
     if c.fetchone()[0] == 0:
 
-        c.execute("INSERT INTO usuarios (nome) VALUES ('João')")
-        c.execute("INSERT INTO usuarios (nome) VALUES ('Maria')")
-        c.execute("INSERT INTO usuarios (nome) VALUES ('Carlos')")
+        c.executemany(
+            "INSERT INTO usuarios (nome) VALUES (?)",
+            [("João",), ("Maria",), ("Carlos",)]
+        )
 
     conn.commit()
     conn.close()
@@ -142,7 +109,11 @@ def login():
 
     conn.close()
 
-    return render_template("login.html", usuarios=usuarios, erro=erro)
+    return render_template(
+        "login.html",
+        usuarios=usuarios,
+        erro=erro
+    )
 
 
 # -----------------------
@@ -165,39 +136,28 @@ def home():
     c = conn.cursor()
 
     c.execute("""
-        SELECT data, entrada, saida_almoco, volta_almoco,
-               saida_final, horas, horas_extras
+        SELECT data, entrada, saida_almoco, volta_almoco, saida_final, horas, horas_extras
         FROM ponto
-        WHERE funcionario = %s
-        ORDER BY id DESC
-    """ if DATABASE_URL else """
-        SELECT data, entrada, saida_almoco, volta_almoco,
-               saida_final, horas, horas_extras
-        FROM ponto
-        WHERE funcionario = ?
+        WHERE funcionario=?
         ORDER BY id DESC
     """, (usuario,))
 
     dados = c.fetchall()
 
     c.execute("""
-        SELECT COALESCE(SUM(horas),0)
+        SELECT ROUND(SUM(horas),2),
+               ROUND(SUM(horas_extras),2)
         FROM ponto
-        WHERE funcionario = %s
-    """ if DATABASE_URL else """
-        SELECT COALESCE(SUM(horas),0)
-        FROM ponto
-        WHERE funcionario = ?
+        WHERE funcionario=?
     """, (usuario,))
 
-    total = round(float(c.fetchone()[0]), 2)
+    result = c.fetchone()
 
+    total = result[0] or 0
+    total_extras = result[1] or 0
+
+    # verificar próxima batida
     c.execute("""
-        SELECT entrada, saida_almoco, volta_almoco, saida_final
-        FROM ponto
-        WHERE funcionario=%s AND data=%s
-        ORDER BY id DESC LIMIT 1
-    """ if DATABASE_URL else """
         SELECT entrada, saida_almoco, volta_almoco, saida_final
         FROM ponto
         WHERE funcionario=? AND data=?
@@ -233,6 +193,7 @@ def home():
         data=data,
         dados=dados,
         total=total,
+        total_extras=total_extras,
         proxima=proxima
     )
 
@@ -249,6 +210,7 @@ def bater():
     usuario = session["usuario"]
 
     agora = datetime.now(BRASILIA).strftime("%H:%M")
+
     data = datetime.now(BRASILIA).strftime("%d/%m/%Y")
 
     conn = get_conn()
@@ -257,38 +219,35 @@ def bater():
     c.execute("""
         SELECT id, entrada, saida_almoco, volta_almoco, saida_final
         FROM ponto
-        WHERE funcionario=%s AND data=%s
-        ORDER BY id DESC LIMIT 1
-    """ if DATABASE_URL else """
-        SELECT id, entrada, saida_almoco, volta_almoco, saida_final
-        FROM ponto
         WHERE funcionario=? AND data=?
         ORDER BY id DESC LIMIT 1
     """, (usuario, data))
 
     row = c.fetchone()
 
+    # entrada
     if not row:
 
         c.execute("""
             INSERT INTO ponto
-            (funcionario,data,entrada)
-            VALUES (%s,%s,%s)
-        """ if DATABASE_URL else """
-            INSERT INTO ponto
-            (funcionario,data,entrada)
-            VALUES (?,?,?)
+            (funcionario, data, entrada, horas, horas_extras)
+            VALUES (?, ?, ?, 0, 0)
         """, (usuario, data, agora))
 
     else:
 
         pid, e, sa, va, sf = row
 
+        ultimo = sf or va or sa or e
+
+        if ultimo == agora:
+
+            conn.close()
+            return redirect("/home")
+
         if e and not sa:
 
             c.execute(
-                "UPDATE ponto SET saida_almoco=%s WHERE id=%s"
-                if DATABASE_URL else
                 "UPDATE ponto SET saida_almoco=? WHERE id=?",
                 (agora, pid)
             )
@@ -296,44 +255,47 @@ def bater():
         elif sa and not va:
 
             c.execute(
-                "UPDATE ponto SET volta_almoco=%s WHERE id=%s"
-                if DATABASE_URL else
                 "UPDATE ponto SET volta_almoco=? WHERE id=?",
                 (agora, pid)
             )
 
         elif va and not sf:
 
-            def min(h):
-                t = datetime.strptime(h, "%H:%M")
-                return t.hour*60+t.minute
+            formato = "%H:%M"
 
-            total_min = (min(sa)-min(e))+(min(agora)-min(va))
-            horas = round(total_min/60,2)
+            def em_minutos(h):
+                t = datetime.strptime(h, formato)
+                return t.hour * 60 + t.minute
 
-            horas_extras = round(horas-8,2) if horas>8 else 0
+            total_min = (
+                em_minutos(sa) - em_minutos(e)
+            ) + (
+                em_minutos(agora) - em_minutos(va)
+            )
+
+            horas = round(total_min / 60, 2)
+
+            # extras acima de 8h
+            if horas > 8:
+                extras = round(horas - 8, 2)
+            else:
+                extras = 0
 
             c.execute("""
                 UPDATE ponto
-                SET saida_final=%s, horas=%s, horas_extras=%s
-                WHERE id=%s
-            """ if DATABASE_URL else """
-                UPDATE ponto
-                SET saida_final=?, horas=?, horas_extras=?
+                SET saida_final=?,
+                    horas=?,
+                    horas_extras=?
                 WHERE id=?
-            """,(agora, horas, horas_extras, pid))
+            """, (agora, horas, extras, pid))
 
         else:
 
             c.execute("""
                 INSERT INTO ponto
-                (funcionario,data,entrada)
-                VALUES (%s,%s,%s)
-            """ if DATABASE_URL else """
-                INSERT INTO ponto
-                (funcionario,data,entrada)
-                VALUES (?,?,?)
-            """,(usuario,data,agora))
+                (funcionario, data, entrada, horas, horas_extras)
+                VALUES (?, ?, ?, 0, 0)
+            """, (usuario, data, agora))
 
     conn.commit()
     conn.close()
@@ -342,24 +304,120 @@ def bater():
 
 
 # -----------------------
-# RELATORIO
+# RELATORIO ADMIN
 # -----------------------
 @app.route("/relatorio")
 def relatorio():
 
-    if session.get("usuario")!="ADMIN":
+    if session.get("usuario") != "ADMIN":
         return redirect("/")
 
-    conn=get_conn()
-    c=conn.cursor()
+    conn = get_conn()
+    c = conn.cursor()
 
-    c.execute("SELECT * FROM ponto ORDER BY id DESC")
+    c.execute("""
+        SELECT *
+        FROM ponto
+        ORDER BY id DESC
+    """)
 
-    dados=c.fetchall()
+    dados = c.fetchall()
 
     conn.close()
 
-    return render_template("relatorio.html",dados=dados)
+    return render_template(
+        "relatorio.html",
+        dados=dados
+    )
+
+
+# -----------------------
+# ZERAR
+# -----------------------
+@app.route("/zerar-horas", methods=["POST"])
+def zerar_horas():
+
+    if session.get("usuario") != "ADMIN":
+        return redirect("/")
+
+    conn = get_conn()
+    c = conn.cursor()
+
+    c.execute("DELETE FROM ponto")
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/relatorio")
+
+
+# -----------------------
+# EDITAR
+# -----------------------
+@app.route("/editar/<int:id>", methods=["GET", "POST"])
+def editar(id):
+
+    if session.get("usuario") != "ADMIN":
+        return redirect("/")
+
+    conn = get_conn()
+    c = conn.cursor()
+
+    if request.method == "POST":
+
+        entrada = request.form["entrada"]
+        saida_almoco = request.form["saida_almoco"]
+        volta_almoco = request.form["volta_almoco"]
+        saida_final = request.form["saida_final"]
+
+        formato = "%H:%M"
+
+        def em_minutos(h):
+            t = datetime.strptime(h, formato)
+            return t.hour * 60 + t.minute
+
+        horas = (
+            (em_minutos(saida_almoco) - em_minutos(entrada))
+            + (em_minutos(saida_final) - em_minutos(volta_almoco))
+        ) / 60
+
+        horas = round(horas, 2)
+
+        extras = horas - 8 if horas > 8 else 0
+
+        c.execute("""
+            UPDATE ponto
+            SET entrada=?,
+                saida_almoco=?,
+                volta_almoco=?,
+                saida_final=?,
+                horas=?,
+                horas_extras=?
+            WHERE id=?
+        """, (
+            entrada,
+            saida_almoco,
+            volta_almoco,
+            saida_final,
+            horas,
+            extras,
+            id
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return redirect("/relatorio")
+
+    c.execute("SELECT * FROM ponto WHERE id=?", (id,))
+    registro = c.fetchone()
+
+    conn.close()
+
+    return render_template(
+        "editar.html",
+        registro=registro
+    )
 
 
 # -----------------------
@@ -369,16 +427,15 @@ def relatorio():
 def logout():
 
     session.clear()
-
     return redirect("/")
 
 
 # -----------------------
 # RUN
 # -----------------------
-if __name__=="__main__":
+if __name__ == "__main__":
 
     app.run(
         host="0.0.0.0",
-        port=int(os.environ.get("PORT",5000))
+        port=int(os.environ.get("PORT", 5000))
     )
