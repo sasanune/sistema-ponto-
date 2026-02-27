@@ -2,33 +2,46 @@ from flask import Flask, render_template, request, redirect, session
 import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import sys
 import os
 
-app = Flask(__name__)
+if getattr(sys, 'frozen', False):
+    base_path = sys._MEIPASS
+else:
+    base_path = os.path.abspath(".")
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(base_path, "templates"),
+    static_folder=os.path.join(base_path, "static")
+)
 app.secret_key = "chave_secreta_simples"
 
 ADMIN_SENHA = "1234"
 
-# timezone Brasília
 BRASILIA = ZoneInfo("America/Sao_Paulo")
 
-# caminho persistente no Render
-DB_PATH = "/opt/render/project/src/banco.db"
-
 
 # -----------------------
-# conexão banco
+# CONEXÃO BANCO
 # -----------------------
-def get_conn():
-    return sqlite3.connect(DB_PATH)
+def conectar():
 
+    if getattr(sys, 'frozen', False):
+        pasta = os.path.dirname(sys.executable)
+    else:
+        pasta = os.path.abspath(".")
+
+    caminho = os.path.join(pasta, "banco.db")
+
+    return sqlite3.connect(caminho)
 
 # -----------------------
-# criar banco
+# CRIAR BANCO
 # -----------------------
 def criar_banco():
 
-    conn = get_conn()
+    conn = conectar()
     c = conn.cursor()
 
     c.execute("""
@@ -48,7 +61,7 @@ def criar_banco():
             volta_almoco TEXT,
             saida_final TEXT,
             horas REAL,
-            horas_extras REAL
+            horas_extras REAL DEFAULT 0
         )
     """)
 
@@ -69,6 +82,29 @@ criar_banco()
 
 
 # -----------------------
+# CALCULAR HORAS
+# -----------------------
+def calcular_horas(e, sa, va, sf):
+
+    formato = "%H:%M"
+
+    def minutos(h):
+        t = datetime.strptime(h, formato)
+        return t.hour * 60 + t.minute
+
+    total = (minutos(sa) - minutos(e)) + (minutos(sf) - minutos(va))
+
+    horas = round(total / 60, 2)
+
+    if horas > 8:
+        extra = round(horas - 8, 2)
+    else:
+        extra = 0
+
+    return horas, extra
+
+
+# -----------------------
 # LOGIN
 # -----------------------
 @app.route("/", methods=["GET", "POST"])
@@ -77,7 +113,7 @@ def login():
     if request.method == "GET":
         session.clear()
 
-    conn = get_conn()
+    conn = conectar()
     c = conn.cursor()
 
     c.execute("SELECT nome FROM usuarios")
@@ -87,15 +123,14 @@ def login():
 
     if request.method == "POST":
 
-        senha_admin = request.form.get("admin_senha", "").strip()
-        usuario = request.form.get("usuario", "").strip()
+        senha = request.form.get("admin_senha")
+        usuario = request.form.get("usuario")
 
-        if senha_admin:
+        if senha:
 
-            if senha_admin == ADMIN_SENHA:
+            if senha == ADMIN_SENHA:
 
                 session["usuario"] = "ADMIN"
-                conn.close()
                 return redirect("/relatorio")
 
             else:
@@ -104,7 +139,6 @@ def login():
         elif usuario:
 
             session["usuario"] = usuario
-            conn.close()
             return redirect("/home")
 
     conn.close()
@@ -132,11 +166,12 @@ def home():
 
     data = datetime.now(BRASILIA).strftime("%d/%m/%Y")
 
-    conn = get_conn()
+    conn = conectar()
     c = conn.cursor()
 
     c.execute("""
-        SELECT data, entrada, saida_almoco, volta_almoco, saida_final, horas, horas_extras
+        SELECT data, entrada, saida_almoco, volta_almoco,
+        saida_final, horas, horas_extras
         FROM ponto
         WHERE funcionario=?
         ORDER BY id DESC
@@ -145,18 +180,16 @@ def home():
     dados = c.fetchall()
 
     c.execute("""
-        SELECT ROUND(SUM(horas),2),
-               ROUND(SUM(horas_extras),2)
+        SELECT SUM(horas), SUM(horas_extras)
         FROM ponto
         WHERE funcionario=?
     """, (usuario,))
 
-    result = c.fetchone()
+    total = c.fetchone()
 
-    total = result[0] or 0
-    total_extras = result[1] or 0
+    total_horas = total[0] or 0
+    total_extra = total[1] or 0
 
-    # verificar próxima batida
     c.execute("""
         SELECT entrada, saida_almoco, volta_almoco, saida_final
         FROM ponto
@@ -192,8 +225,8 @@ def home():
         usuario=usuario,
         data=data,
         dados=dados,
-        total=total,
-        total_extras=total_extras,
+        total=round(total_horas,2),
+        extra=round(total_extra,2),
         proxima=proxima
     )
 
@@ -210,14 +243,14 @@ def bater():
     usuario = session["usuario"]
 
     agora = datetime.now(BRASILIA).strftime("%H:%M")
-
     data = datetime.now(BRASILIA).strftime("%d/%m/%Y")
 
-    conn = get_conn()
+    conn = conectar()
     c = conn.cursor()
 
     c.execute("""
-        SELECT id, entrada, saida_almoco, volta_almoco, saida_final
+        SELECT id, entrada, saida_almoco,
+        volta_almoco, saida_final
         FROM ponto
         WHERE funcionario=? AND data=?
         ORDER BY id DESC LIMIT 1
@@ -225,25 +258,17 @@ def bater():
 
     row = c.fetchone()
 
-    # entrada
     if not row:
 
         c.execute("""
             INSERT INTO ponto
-            (funcionario, data, entrada, horas, horas_extras)
-            VALUES (?, ?, ?, 0, 0)
+            (funcionario, data, entrada)
+            VALUES (?, ?, ?)
         """, (usuario, data, agora))
 
     else:
 
         pid, e, sa, va, sf = row
-
-        ultimo = sf or va or sa or e
-
-        if ultimo == agora:
-
-            conn.close()
-            return redirect("/home")
 
         if e and not sa:
 
@@ -261,40 +286,22 @@ def bater():
 
         elif va and not sf:
 
-            formato = "%H:%M"
-
-            def em_minutos(h):
-                t = datetime.strptime(h, formato)
-                return t.hour * 60 + t.minute
-
-            total_min = (
-                em_minutos(sa) - em_minutos(e)
-            ) + (
-                em_minutos(agora) - em_minutos(va)
+            horas, extra = calcular_horas(
+                e, sa, va, agora
             )
-
-            horas = round(total_min / 60, 2)
-
-            # extras acima de 8h
-            if horas > 8:
-                extras = round(horas - 8, 2)
-            else:
-                extras = 0
 
             c.execute("""
                 UPDATE ponto
-                SET saida_final=?,
-                    horas=?,
-                    horas_extras=?
+                SET saida_final=?, horas=?, horas_extras=?
                 WHERE id=?
-            """, (agora, horas, extras, pid))
+            """, (agora, horas, extra, pid))
 
         else:
 
             c.execute("""
                 INSERT INTO ponto
-                (funcionario, data, entrada, horas, horas_extras)
-                VALUES (?, ?, ?, 0, 0)
+                (funcionario, data, entrada)
+                VALUES (?, ?, ?)
             """, (usuario, data, agora))
 
     conn.commit()
@@ -304,7 +311,7 @@ def bater():
 
 
 # -----------------------
-# RELATORIO ADMIN
+# RELATORIO
 # -----------------------
 @app.route("/relatorio")
 def relatorio():
@@ -312,111 +319,19 @@ def relatorio():
     if session.get("usuario") != "ADMIN":
         return redirect("/")
 
-    conn = get_conn()
-    c = conn.cursor()
+    conn = conectar()
 
-    c.execute("""
+    dados = conn.execute("""
         SELECT *
         FROM ponto
         ORDER BY id DESC
-    """)
-
-    dados = c.fetchall()
+    """).fetchall()
 
     conn.close()
 
     return render_template(
         "relatorio.html",
         dados=dados
-    )
-
-
-# -----------------------
-# ZERAR
-# -----------------------
-@app.route("/zerar-horas", methods=["POST"])
-def zerar_horas():
-
-    if session.get("usuario") != "ADMIN":
-        return redirect("/")
-
-    conn = get_conn()
-    c = conn.cursor()
-
-    c.execute("DELETE FROM ponto")
-
-    conn.commit()
-    conn.close()
-
-    return redirect("/relatorio")
-
-
-# -----------------------
-# EDITAR
-# -----------------------
-@app.route("/editar/<int:id>", methods=["GET", "POST"])
-def editar(id):
-
-    if session.get("usuario") != "ADMIN":
-        return redirect("/")
-
-    conn = get_conn()
-    c = conn.cursor()
-
-    if request.method == "POST":
-
-        entrada = request.form["entrada"]
-        saida_almoco = request.form["saida_almoco"]
-        volta_almoco = request.form["volta_almoco"]
-        saida_final = request.form["saida_final"]
-
-        formato = "%H:%M"
-
-        def em_minutos(h):
-            t = datetime.strptime(h, formato)
-            return t.hour * 60 + t.minute
-
-        horas = (
-            (em_minutos(saida_almoco) - em_minutos(entrada))
-            + (em_minutos(saida_final) - em_minutos(volta_almoco))
-        ) / 60
-
-        horas = round(horas, 2)
-
-        extras = horas - 8 if horas > 8 else 0
-
-        c.execute("""
-            UPDATE ponto
-            SET entrada=?,
-                saida_almoco=?,
-                volta_almoco=?,
-                saida_final=?,
-                horas=?,
-                horas_extras=?
-            WHERE id=?
-        """, (
-            entrada,
-            saida_almoco,
-            volta_almoco,
-            saida_final,
-            horas,
-            extras,
-            id
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return redirect("/relatorio")
-
-    c.execute("SELECT * FROM ponto WHERE id=?", (id,))
-    registro = c.fetchone()
-
-    conn.close()
-
-    return render_template(
-        "editar.html",
-        registro=registro
     )
 
 
@@ -437,5 +352,6 @@ if __name__ == "__main__":
 
     app.run(
         host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000))
+        port=5000,
+        debug=False
     )
